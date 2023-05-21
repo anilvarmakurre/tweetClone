@@ -5,7 +5,6 @@ const { open } = require("sqlite");
 const sqlite3 = require("sqlite3");
 const path = require("path");
 const jwt = require("jsonwebtoken");
-const format = require("date-fns");
 
 const bcrypt = require("bcrypt");
 
@@ -68,10 +67,10 @@ app.post("/register/", async (request, response) => {
   const { username, password, name, gender } = request.body;
   console.log(username);
   const hashPassword = await bcrypt.hash(request.body.password, 10);
-  const checkUser = `SELECT * FROM user Where username='${username}';`;
-  const dbUser = await database.run(checkUser);
-  console.log(dbUser.user);
-  if (dbUser.user === undefined) {
+  const checkUser = `SELECT user_id FROM user Where username='${username}';`;
+  const dbUser = await database.get(checkUser);
+  console.log(dbUser);
+  if (dbUser === undefined) {
     if (password.length > 6) {
       const getQuery = `INSERT INTO user(username,password,name,gender)
             values('${username}','${hashPassword}','${name}','${gender}');`;
@@ -124,9 +123,9 @@ app.get(
     console.log(user_id);
     const getQuery = `SELECT user.username,tweet.tweet,tweet.date_time as dateTime FROM  user
   INNER JOIN tweet on user.user_id=tweet.user_id
-  INNER JOIN follower on user.user_id=follower.follower_user_id
-  WHERE follower.following_user_id='${user_id}'
-  ORDER By follower.following_user_id
+  INNER JOIN follower on user.user_id=follower.following_user_id
+  WHERE follower.follower_user_id='${user_id}'
+  ORDER By follower.follower_user_id
   LIMIT 4
   OFFSET 0 ;`;
     const getResponse = await database.all(getQuery);
@@ -144,7 +143,7 @@ app.get(
     const getQuery = `SELECT user.name as name FROM user INNER JOIN follower
     ON user.user_id=follower.following_user_id
     WHERE follower.follower_user_id='${user_id}';`;
-    const getResponse = await database.get(getQuery);
+    const getResponse = await database.all(getQuery);
     response.status(200);
     response.send(getResponse);
   }
@@ -159,7 +158,7 @@ app.get(
     const getQuery = `SELECT user.name as name FROM user INNER JOIN follower
     ON user.user_id=follower.follower_user_id
     WHERE follower.following_user_id='${user_id}';`;
-    const getResponse = await database.get(getQuery);
+    const getResponse = await database.all(getQuery);
     response.status(200);
     response.send(getResponse);
   }
@@ -173,6 +172,7 @@ app.get(
     const { tweetId } = request.params;
     console.log(`${tweetId} abn`);
     const { user_id } = request;
+    console.log(user_id);
     const getUser = `SELECT user_id FROM tweet WHERE tweet_id='${tweetId}';`;
     const dbUser = await database.get(getUser);
     console.log(dbUser.user_id, user_id);
@@ -257,9 +257,19 @@ app.get(
   getUserId,
   async (request, response) => {
     const { user_id } = request;
-    const getQuery = `SELECT tweet.tweet,count(like.like_id) as likes,count(reply.reply_id) as replies,tweet.date_time as dateTime
+    // const getUser = `SELECT following_user_id FROM follower WHERE follower_user_id='${user_id}';`;
+    // const followUser = await database.all(getUser);
+    // const followUserId = followUser.map((each) => {
+    //   return each.following_user_id;
+    // });
+
+    console.log(user_id);
+    const getQuery = `SELECT tweet.tweet,count(like.tweet_id) as likes,count(reply.tweet_id) as replies,tweet.date_time as dateTime
     FROM tweet INNER JOIN like ON tweet.tweet_id=like.tweet_id
-    INNER JOIN reply ON tweet.tweet_id=reply.tweet_id;`;
+    INNER JOIN reply ON tweet.tweet_id=reply.tweet_id
+     WHERE tweet.user_id=${user_id}
+    GROUP BY tweet.tweet_id
+    ORDER BY tweet.tweet_id;`;
     const getResponse = await database.all(getQuery);
     console.log(getResponse);
     response.status(200);
@@ -304,7 +314,7 @@ app.delete(
     const dbUser = await database.get(getUser);
     console.log(dbUser.user_id, user_id);
     if (dbUser.user_id !== user_id) {
-      response.status(400);
+      response.status(401);
       response.send("Invalid Request");
     } else {
       const { tweetId } = request.params;
