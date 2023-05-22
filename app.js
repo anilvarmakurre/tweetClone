@@ -121,13 +121,20 @@ app.get(
   async (request, response) => {
     const { user_id } = request;
     console.log(user_id);
-    const getQuery = `SELECT user.username,tweet.tweet,tweet.date_time as dateTime FROM  user
-  INNER JOIN tweet on user.user_id=tweet.user_id
-  INNER JOIN follower on user.user_id=follower.following_user_id
-  WHERE follower.follower_user_id='${user_id}'
-  ORDER By follower.follower_user_id
-  LIMIT 4
-  OFFSET 0 ;`;
+    const getQuery = `
+SELECT
+user.username, tweet.tweet, tweet.date_time AS dateTime
+FROM
+follower
+INNER JOIN tweet
+ON follower.following_user_id = tweet.user_id
+INNER JOIN user
+ON tweet.user_id = user.user_id
+WHERE
+follower.follower_user_id = ${user_id}
+ORDER BY
+tweet.date_time DESC
+LIMIT 4;`;
     const getResponse = await database.all(getQuery);
     response.status(200);
     response.send(getResponse);
@@ -265,8 +272,8 @@ app.get(
 
     console.log(user_id);
     const getQuery = `SELECT tweet.tweet,count(like.tweet_id) as likes,count(reply.tweet_id) as replies,tweet.date_time as dateTime
-    FROM tweet INNER JOIN like ON tweet.tweet_id=like.tweet_id
-    INNER JOIN reply ON tweet.tweet_id=reply.tweet_id
+    FROM tweet  JOIN like ON tweet.tweet_id=like.tweet_id
+     JOIN reply ON tweet.tweet_id=reply.tweet_id
      WHERE tweet.user_id=${user_id}
     GROUP BY tweet.tweet_id
     ORDER BY tweet.tweet_id;`;
